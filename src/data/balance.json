@@ -1,0 +1,198 @@
+{
+  "_comment": "기획서 §13.4 — 모든 수치는 이 파일 하나에. AI 재생성 없이 혼자 튜닝할 수 있어야 한다.",
+
+  "flight": {
+    "_comment": "Phase 0. 여기가 재미없으면 전부 무의미하다 (§11).",
+
+    "gravity": 22.0,
+    "maxSpeed": 78.0,
+    "minAirspeed": 9.0,
+
+    "thrustForward": 9.0,
+    "dragBase": 0.34,
+    "dragBrake": 1.9,
+
+    "pitchRate": 1.5,
+    "yawRate": 0.85,
+    "rollRate": 2.6,
+    "_comment_turn": "선회는 롤을 먼저 넣고 피치로 당기는 항공기식. 요만으로 도는 건 느리게 둬서 롤-피치 조합을 유도한다.",
+
+    "bankTurnFactor": 1.35,
+    "autoLevelRate": 0.9,
+
+    "glideSink": 8.0,
+    "_comment_sink": "수평 활공도 서서히 가라앉는다. 이게 없으면 고도가 공짜가 되고 상승기류가 무의미해진다.",
+    "liftCoefficient": 0.055,
+    "stallAngle": 0.62,
+    "stallLiftPenalty": 0.25,
+
+    "flapImpulse": 9.5,
+    "flapInterval": 0.42,
+    "flapStaminaCost": 7.0,
+
+    "diveSpeedBonus": 1.35,
+    "diveDragFactor": 0.42,
+    "diveStaminaCost": 12.0,
+    "_comment_dive": "급강하는 스태미나를 쓰지만 중력이 대신 일해준다. 고도를 벌고 → 내리꽂고 → 다시 벌기의 3차원 리듬 (§8.2).",
+
+    "staminaMax": 100.0,
+    "staminaRegen": 13.0,
+    "staminaRegenGlideBonus": 7.0,
+    "_comment_stamina": "활공 중에는 회복이 빠르다. 쉬는 방법이 곧 활공이라는 뜻.",
+
+    "highLayerY": 220.0,
+    "midLayerY": 70.0,
+    "highLayerStaminaDrain": 4.5,
+    "_comment_layer": "고층은 체류만으로 스태미나를 깎는다 (§9). 최고급 알이 있는 곳은 공짜가 아니다.",
+
+    "groundY": 0.0,
+    "landingSpeedLimit": 26.0,
+    "crashDamageSpeed": 46.0,
+
+    "cameraDistance": 11.0,
+    "cameraHeight": 5.5,
+    "cameraLag": 8.0,
+    "cameraSpeedPullback": 0.05,
+    "cameraFovBase": 72,
+    "cameraFovSpeedGain": 0.22
+  },
+
+  "thermals": {
+    "_comment": "상승기류 — Phase 0의 핵심 지형 요소. 스태미나 없이 고도를 얻는 유일한 방법.",
+    "_comment_radius": "최대뱅크 선회반경(약 60m)보다 넉넉히 커야 한다. 그러지 않으면 기류 안에서 선회가 불가능해 고도를 벌 수 없다.",
+    "radius": 130.0,
+    "strength": 30.0,
+    "_comment_strength": "선회 중 평균 강도(약 0.44)에서도 활공 침하(glideSink 8)를 이겨야 한다. 17 이면 평균 7.4 로 밀려 돌수록 고도를 잃었다.",
+    "coreRatio": 0.6,
+    "_comment_core": "반경의 60%까지는 강도 1로 균일. 그 밖으로 가장자리까지 선형 감쇠.",
+    "maxY": 260.0,
+    "count": 12,
+    "spawnRadius": 1600.0
+  },
+
+  "stage": {
+    "_comment": "성장 단계별 체격·스탯 배율 (§6.1). 커질수록 강하지만 선회가 무뎌진다 (§6.3 불변 규칙).",
+    "1": { "name": "해츨링", "scale": 1.0, "turnPenalty": 1.0, "hitbox": 1.0, "skillSlots": 0 },
+    "2": { "name": "윙링", "scale": 1.8, "turnPenalty": 0.9, "hitbox": 1.35, "skillSlots": 1 },
+    "3": { "name": "드레이크", "scale": 3.0, "turnPenalty": 0.79, "hitbox": 1.8, "skillSlots": 2 },
+    "4": { "name": "와이번", "scale": 4.5, "turnPenalty": 0.68, "hitbox": 2.4, "skillSlots": 3 },
+    "5": { "name": "엘더", "scale": 6.0, "turnPenalty": 0.58, "hitbox": 3.1, "skillSlots": 4 },
+    "6": { "name": "에인션트", "scale": 8.0, "turnPenalty": 0.48, "hitbox": 4.0, "skillSlots": 4 }
+  },
+
+  "carry": {
+    "_comment": "운반 페널티 — 게임의 중심축 (§2). 알을 든 순간 표적이 된다.",
+    "moveSpeedMult": 0.75,
+    "staminaCostMult": 1.4,
+    "breathDisabled": true,
+    "positionRevealed": true,
+    "dropOnHit": true
+  },
+
+  "status": {
+    "_comment": "상태이상 6종 (§3.2). 대부분이 피해가 아니라 비행 간섭이다.",
+    "burn": { "dpsPerStack": 3.2, "duration": 6.0, "blocksStaminaRegen": true },
+    "chill": { "turnRadiusMult": 1.6, "duration": 5.0, "freezeAtStacks": 3, "freezeDuration": 1.5 },
+    "shock": { "duration": 4.0, "forcedDescent": 11.0 },
+    "corrode": { "defenseMult": 0.7, "healingMult": 0.3, "duration": 8.0 },
+    "weight": { "duration": 5.0, "blocksAscent": true, "fallAccelMult": 2.0 },
+    "devour": { "cooldownMult": 1.5, "duration": 7.0, "blocksSense": true },
+    "maxStacks": 5
+  },
+
+  "reactions": {
+    "_comment": "반응 (§3.3). 파티에서 훨씬 쉽게 터진다 = 비행단 플레이가 시스템적으로 보상받는다.",
+    "steamBurst": { "damage": 140, "radius": 18, "blindDuration": 8.0 },
+    "plagueFlame": { "spreadTargets": 3, "spreadRadius": 22 },
+    "downfall": { "staminaToZero": true, "forceLanding": true },
+    "nervePalsy": { "invertDuration": 1.2 },
+    "crystalCollapse": { "trueDamage": 210, "shardRadius": 14 },
+    "abyssalBrand": { "durationMult": 2.0, "cleansable": false }
+  },
+
+  "affinity": {
+    "_comment": "§3.5 — 트레이드오프가 있어야 육성 방향이 선택이 된다.",
+    "pureThreshold": 0.7,
+    "pureStatusBonus": 1.5,
+    "pureCanSelfReact": false,
+    "dualThreshold": 0.4,
+    "dualMaxIntensity": 0.75,
+    "mongrelMaxIntensity": 0.55
+  },
+
+  "elementTriangle": {
+    "_comment": "§3.4 — 반응이 주(主), 상성은 보조. 삼각형 두 개만.",
+    "advantageMult": 1.2,
+    "edges": {
+      "ember": "blight",
+      "blight": "rime",
+      "rime": "ember",
+      "gale": "umbra",
+      "umbra": "terra",
+      "terra": "gale"
+    }
+  },
+
+  "skillGen": {
+    "_comment": "§4.4 파워 예산 — 조합이 10만 개여도 총합은 항상 같다. 이게 없으면 절대 밸런스를 못 맞춘다.",
+    "budgetBase": 100,
+    "budgetPerStage": 34,
+    "budgetPerGeneMass": 0.012,
+    "budgetGeneMassCap": 900,
+    "maxModifiers": 3,
+    "modifierCost": {
+      "penetrate": 0.16,
+      "split": 0.24,
+      "chain": 0.22,
+      "lifesteal": 0.18,
+      "slow": 0.12,
+      "stackUp": 0.14,
+      "frenzy": 0.2,
+      "coolant": 0.19,
+      "expand": 0.17,
+      "compress": 0.1,
+      "delay": 0.09,
+      "instant": 0.21,
+      "statusUp": 0.15,
+      "noRecoil": 0.08,
+      "updraft": 0.13,
+      "cloak": 0.23,
+      "doubleCast": 0.3,
+      "reignite": 0.18,
+      "rampage": 0.26,
+      "precision": 0.11
+    },
+    "_comment_cost": "강한 변조를 붙일수록 기본 수치가 깎인다. 비율(0~1)로 예산에서 차감한다.",
+    "coreWeight": {
+      "breath": 12, "bolt": 12, "field": 9, "charge": 10, "smash": 9, "summon": 5,
+      "aura": 7, "bind": 7, "warp": 4, "reflect": 5, "drain": 6, "burst": 8
+    },
+    "shapeWeight": {
+      "cone": 12, "pierce": 10, "sphere": 9, "trail": 6,
+      "selfCentered": 8, "groundTarget": 8, "homing": 6, "delayedTrap": 5
+    },
+    "rerollCandidates": 3,
+    "_comment_reroll": "§4.5 — 굴리기 전 3개 후보를 보여주고 선택. 완전 랜덤의 좌절감 제거."
+  },
+
+  "divine": {
+    "_comment": "§5.4 견제 장치. 시즌 초 수치는 약하게 잡고 올려라. 반대는 불가능하다 (§12).",
+    "absorbChannelSeconds": 10.0,
+    "announceCountdownSeconds": 180,
+    "alwaysRevealed": true,
+    "crownWeightPerAttacker": 0.4,
+    "crownWeightMinAttackers": 3,
+    "crownWeightMaxBonus": 1.2,
+    "coreDropSeconds": 30.0,
+    "coreSeizeChannelSeconds": 8.0,
+    "finaleDelayHours": 72
+  },
+
+  "death": {
+    "_comment": "§8.3 — 용은 죽지 않고 추락한다.",
+    "geneMassLoss": 0.05,
+    "reviveSeconds": 30,
+    "dropsUnhatchedEggs": true,
+    "stageDemotion": false
+  }
+}

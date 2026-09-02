@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EGGFALL — Phase 0</title>
+<style>
+  :root{
+    --tx:#e9f0fb; --tx2:#9db0cc; --tx3:#63748f;
+    --good:#6ee7d7; --bad:#ff5c6c; --warn:#ffc93c; --acc:#8fb8ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#0b1220}
+  body{
+    font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+    color:var(--tx); font-size:14px; -webkit-font-smoothing:antialiased;
+  }
+  #game{display:block;width:100%;height:100%;cursor:crosshair}
+
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  .hud-left{position:absolute;left:22px;bottom:22px;display:flex;flex-direction:column;gap:9px}
+  .gauge{display:flex;align-items:baseline;gap:7px;font-variant-numeric:tabular-nums}
+  .gauge .label{font-size:11px;color:var(--tx3);letter-spacing:.08em;width:30px}
+  .gauge b{font-size:30px;font-weight:700;line-height:1;min-width:74px;
+           text-shadow:0 2px 10px rgba(0,0,0,.7)}
+  .gauge .unit{font-size:11px;color:var(--tx3)}
+
+  .stam{display:flex;align-items:center;gap:9px;margin-top:3px}
+  .stam-bar{width:190px;height:9px;background:rgba(8,14,24,.85);
+            border:1px solid #24354f;border-radius:5px;overflow:hidden}
+  .stam-bar i{display:block;height:100%;width:100%;
+              background:linear-gradient(90deg,#2e8b8b,#6ee7d7);transition:width .08s linear}
+  .stam .label{font-size:12px;color:var(--tx2);font-variant-numeric:tabular-nums;min-width:26px}
+
+  .layer{font-size:11.5px;color:var(--tx2);letter-spacing:.04em;margin-top:2px}
+  .layer.high{color:var(--warn)}
+  .layer.low{color:#9dd648}
+
+  .hud-center{position:absolute;left:50%;top:19%;transform:translateX(-50%);text-align:center}
+  .alert{font-size:15px;font-weight:700;letter-spacing:.03em;min-height:22px;
+         text-shadow:0 2px 12px rgba(0,0,0,.85);opacity:.95}
+  .alert.bad{color:var(--bad)}
+  .alert.good{color:var(--good)}
+  .alert.warn{color:var(--warn)}
+  .alert.dive{color:var(--acc)}
+
+  .hud-right{position:absolute;right:22px;bottom:22px;text-align:right}
+  @media(max-height:620px){.radar{width:110px;height:110px}}
+  .stage{font-size:13px;color:var(--tx2);font-weight:700;margin-bottom:9px;letter-spacing:.05em}
+  .keys{font-size:11px;color:var(--tx3);line-height:1.85}
+  .keys .dim{color:#4a5870;margin-top:5px}
+  kbd{display:inline-block;background:rgba(28,40,60,.9);border:1px solid #33445f;
+      border-radius:4px;padding:0 5px;margin-right:2px;font-family:inherit;
+      font-size:10.5px;color:var(--tx2)}
+
+  /* 상승기류 레이더 — 핵심 자원을 눈으로만 찾게 두면 대부분 놓친다 */
+  .radar{position:absolute;right:22px;top:22px;width:150px;height:150px;opacity:.92}
+
+  /* 속도 스트릭 — 가장자리가 흘러야 빠르다고 느낀다 */
+  .streaks{position:absolute;inset:0;opacity:0;transition:opacity .18s;
+           background:
+             radial-gradient(ellipse 62% 58% at 50% 50%,
+               rgba(255,255,255,0) 55%, rgba(190,220,255,.13) 100%);
+           mix-blend-mode:screen}
+
+  /* 상태 비네트 — 색 하나로 지금이 위험한지 신나는지 알린다 */
+  .vignette{position:absolute;inset:0;transition:box-shadow .3s;box-shadow:none}
+  .vignette.stall{box-shadow:inset 0 0 190px 30px rgba(255,60,80,.34)}
+  .vignette.dive{box-shadow:inset 0 0 210px 40px rgba(90,160,255,.24)}
+  .vignette.lift{box-shadow:inset 0 0 170px 26px rgba(80,230,215,.2)}
+
+  .flash{position:absolute;left:50%;top:38%;transform:translateX(-50%);
+         font-size:30px;font-weight:800;opacity:0;transition:opacity .25s;
+         text-shadow:0 3px 18px rgba(0,0,0,.9);letter-spacing:.04em}
+  .flash.on{opacity:1}
+
+  #hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+        z-index:20;text-align:center;pointer-events:none;transition:opacity .5s}
+  #hint h1{font-size:26px;letter-spacing:.14em;font-weight:800;margin-bottom:8px}
+  #hint p{font-size:13px;color:var(--tx2);line-height:1.7}
+  #hint.gone{opacity:0}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"></div>
+<div id="hint">
+  <h1>EGGFALL</h1>
+  <p>Phase 0 — 비행 컨트롤러<br>
+     <b>W/S</b> 기수 · <b>A/D</b> 선회 · <b>Q/E</b> 롤 · <b>Space</b> 날갯짓 · <b>Shift</b> 급강하<br>
+     푸른 기둥은 상승기류입니다. 스태미나 없이 고도를 얻을 수 있습니다.</p>
+</div>
+<script type="module" src="/src/main.ts"></script>
+<script>
+  // 첫 입력이 들어오면 안내를 치운다
+  const hint = document.getElementById('hint');
+  const clear = () => { hint.className = 'gone'; removeEventListener('keydown', clear); removeEventListener('mousedown', clear); };
+  addEventListener('keydown', clear);
+  addEventListener('mousedown', clear);
+  setTimeout(clear, 9000);
+</script>
+</body>
+</html>
