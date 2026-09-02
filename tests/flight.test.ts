@@ -1,8 +1,8 @@
 /**
- * 비행 시뮬레이션 테스트
+ * 비행 시뮬레이션 테스트 — 단순 조작 모델
  *
- * 기획서 §13.3 의 원칙을 비행에도 적용한다: 순수 함수이므로 단독으로 검증할 수 있다.
- * 브라우저에서 눈으로 튜닝하면 재현이 안 되고, 회귀도 못 잡는다.
+ * 마우스가 보는 방향이 곧 비행 방향, WASD 는 그 기준 이동, Space/Shift 는 상승/하강.
+ * 스태미나·실속·상승기류는 없다.
  *
  * 실행: npx tsx --test tests/flight.test.ts
  */
@@ -11,11 +11,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createFlightState,
-  createRuntime,
   neutralInput,
   stepFlight,
-  generateThermals,
-  thermalAt,
+  forwardVector,
   layerOf,
 } from '../src/flight/simulate.ts';
 import type { FlightInput } from '../src/types.ts';
@@ -24,151 +22,140 @@ import { terrainHeight, TERRAIN_MIN, TERRAIN_MAX } from '../src/world/terrain.ts
 
 const F = balance.flight;
 
-/** n초간 시뮬레이션을 돌리고 최종 상태를 돌려준다 */
-function fly(seconds: number, input: Partial<FlightInput> = {}, y0 = 300) {
-  const s = createFlightState(0, y0, 0);
-  const rt = createRuntime();
+/** n초간 시뮬레이션을 돌리고 최종 상태를 돌려준다. lookYaw/lookPitch 는 기본적으로 state 와 같게 둔다(즉시 그 방향을 보고 있다고 가정). */
+function fly(
+  seconds: number,
+  input: Partial<FlightInput> = {},
+  opts: { y0?: number; yaw?: number; pitch?: number; turnRateMult?: number } = {},
+) {
+  const y0 = opts.y0 ?? 300;
+  const yaw = opts.yaw ?? 0;
+  const pitch = opts.pitch ?? 0;
+  const s = createFlightState(0, y0, 0, yaw);
+  s.pitch = pitch;
   const cmd = { ...neutralInput(), ...input };
   const dt = 1 / 60;
   const steps = Math.round(seconds / dt);
-  for (let i = 0; i < steps; i++) stepFlight(s, rt, cmd, dt, []);
+  for (let i = 0; i < steps; i++) stepFlight(s, cmd, yaw, pitch, dt, opts.turnRateMult ?? 1);
   return s;
 }
 
 const speedOf = (s: { vx: number; vy: number; vz: number }) => Math.hypot(s.vx, s.vy, s.vz);
 
-/* 피치 부호 규약 (input.ts 와 일치해야 한다)
-   NOSE_DOWN(-1) = W = 하강·가속 / NOSE_UP(+1) = S = 상승·감속 */
-const NOSE_DOWN = -1;
-const NOSE_UP = 1;
+test('가만히 있으면 제자리에 뜬 채로 머문다 — 스태미나가 없으니 떨어지지 않는다', () => {
+  const s = fly(3, {}, { y0: 300 });
+  assert.ok(Math.abs(s.y - 300) < 0.5, `입력 없이 3초 뒤 고도가 ${s.y.toFixed(1)} 로 변했다`);
+  assert.ok(speedOf(s) < 0.5, `입력 없는데 속도가 ${speedOf(s).toFixed(1)} 남아있다`);
+});
 
-test('출발 즉시 실속하지 않는다 — 초기 속도는 기수 방향이어야 한다', () => {
-  const s = createFlightState(0, 300, 0);
-  assert.ok(speedOf(s) >= F.minAirspeed, `초기 속도 ${speedOf(s)} 가 최소 대기속도 미만`);
+test('W 를 누르면 보는 방향으로 전진한다', () => {
+  const s = fly(3, { forward: 1 }, { yaw: 0, y0: 300 });
+  // yaw=0 이면 정면은 +z
+  assert.ok(s.z > 50, `3초간 전진했는데 z가 ${s.z.toFixed(1)} 밖에 안 나갔다`);
+  assert.ok(Math.abs(s.x) < 1, `전진만 했는데 x가 ${s.x.toFixed(1)} 로 틀어졌다`);
+});
 
-  // 1초 뒤에도 실속하지 않아야 한다
-  const after = fly(1);
+test('S 를 누르면 반대 방향으로 후진한다', () => {
+  const s = fly(2, { forward: -1 }, { yaw: 0, y0: 300 });
+  assert.ok(s.z < -20, `후진했는데 z가 ${s.z.toFixed(1)}`);
+});
+
+test('시선이 다른 방향이면 그쪽으로 전진한다 — 마우스 방향 = 비행 방향', () => {
+  const s = fly(3, { forward: 1 }, { yaw: Math.PI / 2, y0: 300 });
+  // yaw=90도 방향은 +x
+  assert.ok(s.x > 50, `90도 방향을 보고 전진했는데 x가 ${s.x.toFixed(1)}`);
+  assert.ok(Math.abs(s.z) < 5, `x쪽으로만 가야 하는데 z가 ${s.z.toFixed(1)}`);
+});
+
+test('위를 보고 전진하면 고도가 오른다', () => {
+  const s = fly(3, { forward: 1 }, { yaw: 0, pitch: 0.5, y0: 300 });
+  assert.ok(s.y > 320, `위를 보고 전진했는데 고도가 ${s.y.toFixed(1)} 로 거의 그대로다`);
+});
+
+test('A/D 는 시선과 무관하게 수평으로만 이동한다 (피치를 올려다봐도 안 뜬다)', () => {
+  const s = fly(3, { strafe: 1 }, { yaw: 0, pitch: 0.6, y0: 300 });
+  assert.ok(Math.abs(s.y - 300) < 1, `strafe 만 했는데 고도가 ${s.y.toFixed(1)} 로 변했다`);
+  assert.ok(Math.abs(s.x) > 40, `옆으로 이동했는데 x가 ${s.x.toFixed(1)}`);
+});
+
+test('Space 를 누르면 시선 방향과 무관하게 상승한다', () => {
+  const s = fly(2, { ascend: true }, { yaw: 0, pitch: -0.4, y0: 300 }); // 아래를 보고 있어도
+  assert.ok(s.y > 330, `Space 를 눌렀는데 고도가 ${s.y.toFixed(1)} 밖에 안 올랐다`);
+});
+
+test('Shift 를 누르면 하강한다', () => {
+  const s = fly(2, { descend: true }, { y0: 300 });
+  assert.ok(s.y < 270, `Shift 를 눌렀는데 고도가 ${s.y.toFixed(1)}`);
+});
+
+test('Space 와 Shift 를 동시에 누르면 서로 상쇄된다', () => {
+  const s = fly(2, { ascend: true, descend: true }, { y0: 300 });
+  assert.ok(Math.abs(s.y - 300) < 1, `동시 입력인데 고도가 ${s.y.toFixed(1)} 로 변했다`);
+});
+
+test('무제한 상승이 가능하다 — 실속·스태미나 없음', () => {
+  const s = fly(20, { ascend: true }, { y0: 300 });
+  assert.ok(s.y > 800, `20초 상승했는데 고도가 겨우 ${s.y.toFixed(1)}`);
+});
+
+test('속도는 목표치로 수렴하지, 순간이동하지 않는다 (부드러운 가속)', () => {
+  const s0 = createFlightState(0, 300, 0, 0);
+  const cmd = { ...neutralInput(), forward: 1 };
+  stepFlight(s0, cmd, 0, 0, 1 / 60);
+  assert.ok(speedOf(s0) < F.moveSpeed * 0.5, `한 프레임 만에 속도가 ${speedOf(s0).toFixed(1)} 로 거의 최고 속도`);
+
+  const s1 = fly(2, { forward: 1 });
+  assert.ok(Math.abs(speedOf(s1) - F.moveSpeed) < 1, `2초 후 속도 ${speedOf(s1).toFixed(1)} 가 목표 ${F.moveSpeed} 에 못 미친다`);
+});
+
+test('대각선(전진+좌우)이 지나치게 빨라지지 않는다', () => {
+  const straight = fly(2, { forward: 1 });
+  const diag = fly(2, { forward: 1, strafe: 1 });
   assert.ok(
-    speedOf(after) >= F.minAirspeed,
-    `1초 후 속도 ${speedOf(after).toFixed(1)} 이 실속 구간`,
+    speedOf(diag) <= speedOf(straight) * 1.5 + 1,
+    `대각 이동 속도 ${speedOf(diag).toFixed(1)} 가 직선 ${speedOf(straight).toFixed(1)} 보다 과하게 빠르다`,
   );
 });
 
-test('수평 활공은 순항 속도로 수렴한다', () => {
-  const s = fly(12);
-  const cruise = Math.sqrt((F.thrustForward * F.maxSpeed) / F.dragBase);
-  assert.ok(
-    Math.abs(speedOf(s) - cruise) < 6,
-    `순항 ${speedOf(s).toFixed(1)} 이 이론값 ${cruise.toFixed(1)} 과 6m/s 넘게 차이`,
-  );
+test('큰 용일수록 마우스 시점 추적이 느리다 (§6.3 불변 규칙)', () => {
+  const turn = (mult: number) => {
+    const s = createFlightState(0, 300, 0, 0);
+    // 목표 시점을 90도로 갑자기 튼다
+    for (let i = 0; i < 30; i++) stepFlight(s, neutralInput(), Math.PI / 2, 0, 1 / 60, mult);
+    return s.yaw;
+  };
+  const small = turn(balance.stage['1'].turnPenalty);
+  const big = turn(balance.stage['6'].turnPenalty);
+  assert.ok(small > big, `작은 용 ${small.toFixed(2)} 이 큰 용 ${big.toFixed(2)} 보다 안 빠르다`);
 });
 
-test('수평 활공은 고도를 잃는다 — 고도가 공짜면 상승기류가 무의미해진다', () => {
-  const s = fly(10);
-  assert.ok(s.y < 300, `10초 활공 후 고도가 ${s.y.toFixed(1)} 로 떨어지지 않았다`);
-  // 다만 급격히 추락해서도 안 된다
-  assert.ok(s.y > 200, `10초 만에 ${(300 - s.y).toFixed(0)}m 나 잃는다 — 침하가 과하다`);
+test('시점은 최단 경로로 회전한다 (359도 → 1도는 -358도가 아니라 +2도)', () => {
+  const s = createFlightState(0, 300, 0, -0.02); // 약 -1도
+  const targetYaw = 0.02; // 약 +1도, 최단 경로로 2도만 돌면 된다
+  for (let i = 0; i < 3; i++) stepFlight(s, neutralInput(), targetYaw, 0, 1 / 60);
+  assert.ok(Math.abs(s.yaw - targetYaw) < 0.5, `최단 경로로 안 돌고 ${s.yaw.toFixed(2)} 에 있다`);
 });
 
-test('기수를 내리면 가속하고, 올리면 감속한다 (§8.2 고도↔속도 교환)', () => {
-  const down = fly(4, { pitch: NOSE_DOWN }, 2000);
-  const up = fly(4, { pitch: NOSE_UP }, 2000);
-  assert.ok(
-    speedOf(down) > speedOf(up),
-    `기수 내림 ${speedOf(down).toFixed(1)} 이 기수 올림 ${speedOf(up).toFixed(1)} 보다 빠르지 않다`,
-  );
-  assert.ok(down.y < up.y, '기수를 내렸는데 고도가 더 높다');
-});
-
-test('계속 상승하면 실속한다 — 무한 상승은 불가능해야 한다', () => {
-  const s = fly(6, { pitch: NOSE_UP }, 2000);
-  assert.ok(speedOf(s) < F.minAirspeed * 2.2, `상승 6초 후에도 속도 ${speedOf(s).toFixed(1)} 로 여유`);
-});
-
-test('급강하는 순항보다 확실히 빠르다', () => {
-  const dive = fly(6, { pitch: NOSE_DOWN, dive: true }, 2000);
-  const cruise = fly(6, {}, 2000);
-  assert.ok(
-    speedOf(dive) > speedOf(cruise) * 1.5,
-    `급강하 ${speedOf(dive).toFixed(1)} vs 순항 ${speedOf(cruise).toFixed(1)} — 차이가 부족하다`,
-  );
-});
-
-test('급강하는 스태미나를 소모하고, 활공은 회복한다', () => {
-  const dive = fly(5, { pitch: NOSE_DOWN, dive: true }, 2000);
-  assert.ok(dive.stamina < F.staminaMax, '급강하 5초인데 스태미나가 만땅이다');
-
-  // 회복 확인은 반드시 중층에서 한다 — 고층(220m 이상)은 설계상 회복이 없다
-  const glide = fly(5, {}, 150);
-  assert.equal(glide.stamina, F.staminaMax, '중층 활공 중 스태미나가 회복되지 않았다');
-});
-
-test('날갯짓은 스태미나를 쓰고 고도를 준다', () => {
-  const flap = fly(4, { flap: true });
-  const glide = fly(4);
-  assert.ok(flap.y > glide.y, '날갯짓을 해도 활공보다 높지 않다');
-  assert.ok(flap.stamina < glide.stamina, '날갯짓이 스태미나를 소모하지 않았다');
-});
-
-test('스태미나가 무한 날갯짓을 막는다', () => {
-  const s = createFlightState(0, 100, 0);
-  const rt = createRuntime();
-  const cmd = { ...neutralInput(), flap: true };
-  const dt = 1 / 60;
-  let flaps = 0;
-  for (let i = 0; i < 60 * 20; i++) {
-    if (stepFlight(s, rt, cmd, dt, []).flapped) flaps++;
-  }
-  // 무한정 오르지 못하고 스태미나 회복 속도에 묶여야 한다
-  const maxPossible = (20 * F.staminaRegen) / F.flapStaminaCost + F.staminaMax / F.flapStaminaCost;
-  assert.ok(flaps <= Math.ceil(maxPossible) + 1, `20초에 ${flaps}회 날갯짓 — 스태미나 제한이 새고 있다`);
-});
-
-test('고층 체류는 스태미나를 깎는다 (§9)', () => {
-  const high = fly(6, {}, F.highLayerY + 40);
-  const mid = fly(6, {}, 150);
-  assert.ok(high.stamina < F.staminaMax, '고층인데 스태미나가 만땅 그대로다 — 소모가 회복에 묻혔다');
-  assert.ok(
-    high.stamina < mid.stamina,
-    `고층 ${high.stamina.toFixed(0)} 이 중층 ${mid.stamina.toFixed(0)} 보다 적지 않다`,
-  );
-});
-
-test('상승기류는 활공 침하를 이긴다', () => {
-  const thermals = [{ x: 0, z: 0 }];
-  const s = createFlightState(0, 100, 0);
-  const rt = createRuntime();
-  const cmd = neutralInput();
-  const dt = 1 / 60;
-  // 기류 안에 머무르도록 위치를 고정하고 수직 성분만 본다
-  for (let i = 0; i < 60 * 5; i++) {
-    stepFlight(s, rt, cmd, dt, thermals);
-    s.x = 0;
-    s.z = 0;
-  }
-  assert.ok(s.y > 100, `기류 안 5초인데 고도가 ${s.y.toFixed(1)} 로 오르지 않았다`);
-});
-
-test('상승기류는 반경 밖에서 0, 천장 위에서 0', () => {
-  const th = [{ x: 0, z: 0 }];
-  assert.ok(thermalAt(0, 50, 0, th) > 0, '중심에서 기류가 없다');
-  assert.equal(thermalAt(balance.thermals.radius + 5, 50, 0, th), 0, '반경 밖인데 기류가 있다');
-  assert.equal(thermalAt(0, balance.thermals.maxY + 10, 0, th), 0, '천장 위인데 기류가 있다');
-});
-
-test('상승기류 배치는 결정론적이다 — 서버·클라가 같은 월드를 봐야 한다', () => {
-  assert.deepEqual(generateThermals(42), generateThermals(42));
-  assert.notDeepEqual(generateThermals(42), generateThermals(43));
-});
-
-test('지면에 닿으면 착륙 상태가 된다 — 평면이 아니라 실제 지형 위에', () => {
-  const s = fly(60, { pitch: NOSE_DOWN }, 200);
-  assert.equal(s.grounded, true, '60초간 기수를 내렸는데 착륙하지 않았다');
-  // 착륙 높이는 그 지점의 지형 높이여야 한다. 평면 하나로 처리하면 언덕을 뚫는다.
+test('지면에 닿으면 착지하고, 실제 지형 높이를 따른다', () => {
+  const s = fly(60, { descend: true }, { y0: 200 });
+  assert.equal(s.grounded, true, '60초간 하강했는데 착지하지 않았다');
   assert.ok(
     Math.abs(s.y - terrainHeight(s.x, s.z)) < 0.001,
-    `착륙 고도 ${s.y.toFixed(2)} 가 지형 높이 ${terrainHeight(s.x, s.z).toFixed(2)} 와 다르다`,
+    `착지 고도 ${s.y.toFixed(2)} 가 지형 높이 ${terrainHeight(s.x, s.z).toFixed(2)} 와 다르다`,
   );
+});
+
+test('착지 후 Space 로 다시 뜰 수 있다', () => {
+  const s = fly(60, { descend: true }, { y0: 200 });
+  assert.equal(s.grounded, true);
+  const cmd = { ...neutralInput(), ascend: true };
+  for (let i = 0; i < 30; i++) stepFlight(s, cmd, 0, 0, 1 / 60);
+  assert.equal(s.grounded, false, '이륙하지 못했다');
+});
+
+test('지형 아래로는 뚫고 내려가지 않는다', () => {
+  const s = fly(120, { descend: true }, { y0: 500 });
+  assert.ok(s.y >= terrainHeight(s.x, s.z) - 0.001, `지형을 뚫고 ${s.y.toFixed(1)} 까지 내려갔다`);
 });
 
 test('지형 높이는 항상 유한하고 정해진 범위 안이다', () => {
@@ -181,102 +168,24 @@ test('지형 높이는 항상 유한하고 정해진 범위 안이다', () => {
   }
 });
 
-test('능선 높이보다 낮게 날면 지형에 부딪힌다 — 언덕을 통과할 수 없다', () => {
-  // 지형 최고점 부근을 찾아 그 아래로 수평 비행시킨다
-  let peakX = 0, peakZ = 0, peak = 0;
-  for (let x = -2000; x <= 2000; x += 50) {
-    for (let z = -2000; z <= 2000; z += 50) {
-      const h = terrainHeight(x, z);
-      if (h > peak) { peak = h; peakX = x; peakZ = z; }
-    }
-  }
-  const s = createFlightState(peakX, peak - 12, peakZ - 400, 0);
-  const rt = createRuntime();
-  let hit = false;
-  for (let i = 0; i < 60 * 20 && !hit; i++) {
-    if (stepFlight(s, rt, neutralInput(), 1 / 60, []).justLanded) hit = true;
-  }
-  assert.ok(hit, `능선(${peak.toFixed(0)}m) 아래로 날았는데 부딪히지 않았다`);
-});
-
-test('착륙 후 Space 로 이륙할 수 있다', () => {
-  const s = createFlightState(0, 200, 0);
-  const rt = createRuntime();
-  const dt = 1 / 60;
-  const down = { ...neutralInput(), pitch: NOSE_DOWN };
-  for (let i = 0; i < 60 * 60 && !s.grounded; i++) stepFlight(s, rt, down, dt, []);
-  assert.equal(s.grounded, true);
-
-  const up = { ...neutralInput(), flap: true };
-  for (let i = 0; i < 60 * 3; i++) stepFlight(s, rt, up, dt, []);
-  assert.equal(s.grounded, false, '이륙하지 못했다');
-});
-
-test('큰 용일수록 선회가 무뎌진다 (§6.3 불변 규칙)', () => {
-  const turn = (penalty: number) => {
-    const s = createFlightState(0, 300, 0);
-    const rt = createRuntime();
-    const cmd = { ...neutralInput(), yaw: 1 };
-    for (let i = 0; i < 120; i++) stepFlight(s, rt, cmd, 1 / 60, [], penalty);
-    return Math.abs(s.yaw);
-  };
-  const hatchling = turn(balance.stage['1'].turnPenalty);
-  const ancient = turn(balance.stage['6'].turnPenalty);
-  assert.ok(hatchling > ancient, `해츨링 ${hatchling.toFixed(2)} 이 에인션트 ${ancient.toFixed(2)} 보다 못 돈다`);
-});
-
-test('롤을 넣으면 뱅크턴으로 요가 따라온다', () => {
-  const s = createFlightState(0, 300, 0);
-  const rt = createRuntime();
-  const cmd = { ...neutralInput(), roll: 1 };
-  for (let i = 0; i < 120; i++) stepFlight(s, rt, cmd, 1 / 60, []);
-  assert.ok(Math.abs(s.yaw) > 0.3, `롤 2초에 요가 ${s.yaw.toFixed(2)} 밖에 안 돌았다`);
-});
-
-test('롤 입력을 놓으면 수평으로 되돌아온다', () => {
-  const s = createFlightState(0, 300, 0);
-  const rt = createRuntime();
-  for (let i = 0; i < 60; i++) stepFlight(s, rt, { ...neutralInput(), roll: 1 }, 1 / 60, []);
-  const rolled = Math.abs(s.roll);
-  for (let i = 0; i < 60 * 4; i++) stepFlight(s, rt, neutralInput(), 1 / 60, []);
-  assert.ok(Math.abs(s.roll) < rolled * 0.3, `롤이 ${s.roll.toFixed(2)} 로 남아 있다`);
-});
-
 test('큰 dt 에서도 폭발하지 않는다 (탭 복귀 시나리오)', () => {
-  const s = createFlightState(0, 300, 0);
-  const rt = createRuntime();
-  for (let i = 0; i < 40; i++) stepFlight(s, rt, neutralInput(), 0.05, []);
+  const s = createFlightState(0, 300, 0, 0);
+  const cmd = { ...neutralInput(), forward: 1, ascend: true };
+  for (let i = 0; i < 20; i++) stepFlight(s, cmd, 0.3, 0.1, 0.25);
   assert.ok(Number.isFinite(s.x) && Number.isFinite(s.y) && Number.isFinite(s.z), 'NaN 발생');
-  assert.ok(speedOf(s) <= F.maxSpeed * 1.4, `속도 ${speedOf(s).toFixed(1)} 폭주`);
+  assert.ok(speedOf(s) <= F.moveSpeed * 2 + F.verticalSpeed, `속도 ${speedOf(s).toFixed(1)} 폭주`);
+});
+
+test('forwardVector 는 단위 벡터를 낸다', () => {
+  for (const [pitch, yaw] of [[0, 0], [0.4, 1.2], [-0.7, -2.1]] as const) {
+    const v = forwardVector(pitch, yaw);
+    const len = Math.hypot(v.x, v.y, v.z);
+    assert.ok(Math.abs(len - 1) < 1e-9, `길이 ${len} (pitch=${pitch}, yaw=${yaw})`);
+  }
 });
 
 test('고도 3층 경계가 맞다', () => {
   assert.equal(layerOf(10), 'low');
   assert.equal(layerOf(F.midLayerY + 1), 'mid');
   assert.equal(layerOf(F.highLayerY + 1), 'high');
-});
-
-test('상승기류 안에서 선회할 수 있다 — 반경이 선회반경보다 커야 한다', () => {
-  // 이 불변식이 깨지면 기류를 발견해도 고도를 벌 수 없어 Phase 0 의 핵심이 무너진다.
-  const cruise = Math.sqrt((F.thrustForward * F.maxSpeed) / F.dragBase);
-  const omega = F.bankTurnFactor * Math.sin(1.3) * (cruise / F.maxSpeed);
-  const turnRadius = cruise / omega;
-  assert.ok(
-    balance.thermals.radius > turnRadius,
-    `기류 반경 ${balance.thermals.radius}m 가 선회 반경 ${turnRadius.toFixed(0)}m 보다 작다 — 기류 안에서 돌 수 없다`,
-  );
-});
-
-test('기류 안에서 최대뱅크로 선회하면 실제로 고도를 번다', () => {
-  const thermals = [{ x: 0, z: 0 }];
-  const s = createFlightState(0, 80, 0);
-  const rt = createRuntime();
-  // 위치를 고정하지 않는다 — 실제로 원을 그리며 기류 안에 머무는지 본다
-  const cmd = { ...neutralInput(), roll: 1 };
-  const start = s.y;
-  for (let i = 0; i < 60 * 20; i++) stepFlight(s, rt, cmd, 1 / 60, thermals);
-  assert.ok(
-    s.y > start,
-    `20초 선회 후 고도가 ${start} → ${s.y.toFixed(1)} 로 오히려 떨어졌다`,
-  );
 });

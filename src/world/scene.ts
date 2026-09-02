@@ -8,13 +8,11 @@
 
 import * as THREE from 'three';
 import balance from '../data/balance.json';
-import type { Thermal } from '../flight/simulate';
 import { createSky, createClouds, createGroundShadow } from './atmosphere';
 import { terrainHeight } from './terrain';
 import type { GroundShadow } from './atmosphere';
 
 const F = balance.flight;
-const T = balance.thermals;
 
 /** 결정론적 난수 — 서버·클라가 같은 월드를 봐야 한다 */
 function makeRng(seed: number) {
@@ -29,12 +27,11 @@ function makeRng(seed: number) {
 
 export type World = {
   scene: THREE.Scene;
-  thermalMeshes: THREE.Mesh[];
   shadow: GroundShadow;
   update(t: number, dt: number, playerX: number, playerY: number, playerZ: number): void;
 };
 
-export function buildWorld(thermals: Thermal[], seed = 20260902): World {
+export function buildWorld(seed = 20260902): World {
   const scene = new THREE.Scene();
   const rng = makeRng(seed);
 
@@ -116,41 +113,6 @@ export function buildWorld(thermals: Thermal[], seed = 20260902): World {
   spires.instanceMatrix.needsUpdate = true;
   scene.add(spires);
 
-  /* ---------- 상승기류 ---------- */
-  // 보이지 않으면 존재하지 않는 것과 같다. 반드시 시각화한다.
-  const thermalMeshes: THREE.Mesh[] = [];
-  const thermalMat = new THREE.MeshBasicMaterial({
-    color: 0x66e0ff,
-    transparent: true,
-    // 반경 130m 기둥이 12개다. 조금만 진해도 시야를 통째로 덮는다.
-    // 기류의 주 신호는 링과 레이더이고, 기둥은 경계만 알려주면 된다.
-    opacity: 0.022,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-  for (const th of thermals) {
-    const base = terrainHeight(th.x, th.z);
-    const geo = new THREE.CylinderGeometry(T.radius, T.radius * 0.55, T.maxY, 24, 1, true);
-    const mesh = new THREE.Mesh(geo, thermalMat.clone());
-    mesh.position.set(th.x, base + T.maxY / 2, th.z);
-    scene.add(mesh);
-    thermalMeshes.push(mesh);
-
-    // 기둥 안에서 올라가는 링 — 방향(위)을 즉시 읽히게 한다
-    for (let k = 0; k < 3; k++) {
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(T.radius * 0.7, 0.9, 6, 24),
-        new THREE.MeshBasicMaterial({ color: 0x8ceaff, transparent: true, opacity: 0.34 }),
-      );
-      ring.rotation.x = Math.PI / 2;
-      ring.position.set(th.x, base, th.z);
-      ring.userData.baseY = (k / 3) * T.maxY;
-      ring.userData.groundY = base;
-      scene.add(ring);
-      thermalMeshes.push(ring);
-    }
-  }
-
   /* ---------- 구름층 ---------- */
   // 고층 경계를 뚫고 올라가는 순간이 3층 구조(§9)의 가장 강한 신호가 된다.
   const clouds = createClouds(rng);
@@ -197,26 +159,13 @@ export function buildWorld(thermals: Thermal[], seed = 20260902): World {
     ),
   );
 
-  const rings = thermalMeshes.filter((o) => o.userData.baseY !== undefined);
-
   return {
     scene,
-    thermalMeshes,
     shadow,
-    update(t, _dt, px, _py, pz) {
+    update(_t, _dt, px, _py, pz) {
       clouds.follow(px, pz);
       ceiling.position.x = px;
       ceiling.position.z = pz;
-      // 링을 위로 흘려보내 상승 방향을 계속 알린다
-      for (const ring of rings) {
-        const phase = ring.userData.baseY as number;
-        const gY = ring.userData.groundY as number;
-        const rise = (phase + t * 26) % T.maxY;
-        ring.position.y = gY + rise;
-        const mat = ring.material as THREE.MeshBasicMaterial;
-        // 위로 갈수록 옅어져 상승 방향이 읽힌다
-        mat.opacity = 0.34 * (1 - rise / T.maxY);
-      }
     },
   };
 }

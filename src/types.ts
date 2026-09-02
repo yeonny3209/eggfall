@@ -265,18 +265,22 @@ export type SeasonState = {
    비행 (Phase 0)
    ========================================================================== */
 
-/** 조종 입력 1프레임분. 넷코드에서 그대로 직렬화할 수 있도록 순수 데이터로 둔다. */
+/**
+ * 조종 입력 1프레임분. 넷코드에서 그대로 직렬화할 수 있도록 순수 데이터로 둔다.
+ *
+ * "스펙테이터 캠" 모델 — 마우스가 보는 방향이 곧 비행 방향이다.
+ * 요/피치는 여기 없다. InputSource 가 마우스 이동을 직접 누적해
+ * FlightState.yaw/pitch 에 반영하기 때문이다 (조작을 최대한 단순하게 두기 위함).
+ */
 export type FlightInput = {
-  /** -1 ~ 1, 기수 올림/내림 */
-  pitch: number;
-  /** -1 ~ 1, 좌우 선회 */
-  yaw: number;
-  /** -1 ~ 1, 롤 */
-  roll: number;
-  /** Space — 날갯짓 상승 */
-  flap: boolean;
-  /** Shift — 대시 / 급강하 */
-  dive: boolean;
+  /** -1 ~ 1, 보는 방향 기준 전진/후진 (W/S) */
+  forward: number;
+  /** -1 ~ 1, 보는 방향 기준 좌우 이동 (A/D) */
+  strafe: number;
+  /** Space 누르는 동안 상승 */
+  ascend: boolean;
+  /** Shift 누르는 동안 하강 */
+  descend: boolean;
 };
 
 /**
@@ -288,19 +292,16 @@ export type FlightState = {
   x: number;
   y: number;
   z: number;
-  /** 속도 (m/s) */
+  /** 속도 (m/s) — 즉시 정지/출발이 아니라 부드럽게 가감속하기 위해 둔다 */
   vx: number;
   vy: number;
   vz: number;
-  /** 자세 (rad) */
-  pitch: number;
+  /** 보는 방향이자 비행 방향 (rad) */
   yaw: number;
-  roll: number;
-  /** 0 ~ max */
-  stamina: number;
-  /** 착륙 상태 — 스태미나 고갈의 결과 (§8.2) */
+  pitch: number;
+  /** 착륙 상태 — 지면에 닿아 있으면 true */
   grounded: boolean;
 };
 
-/** 고도 3층 구조 (§9) */
+/** 고도 3층 구조 (§9) — 지금은 시각적 구분일 뿐 스태미나 등 수치 효과는 없다 */
 export type Layer = 'low' | 'mid' | 'high';

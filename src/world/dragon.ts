@@ -143,21 +143,24 @@ export function createDragon(tint: THREE.Color): DragonRig {
 
 /**
  * 날갯짓 · 활공 애니메이션
- * @param flapPhase 0~1, 1이면 방금 날갯짓
- * @param speedRatio 0~1, 빠를수록 날개를 접는다 (급강하 실루엣)
+ *
+ * 스태미나·명시적 날갯짓 이벤트가 사라졌으므로, 대신 연속적인 리듬으로 표현한다:
+ * 상승 중일수록 빠르고 크게 퍼덕이고, 순항 중엔 느긋하게, 고속 이동 중엔 날개를 접는다.
+ *
+ * @param flapVigor 0~1, 1이면 힘차게 상승 중(Space)
+ * @param speedRatio 0~1, 빠를수록 날개를 접는다 (고속 실루엣)
  */
-export function animateWings(rig: DragonRig, t: number, flapPhase: number, speedRatio: number) {
+export function animateWings(rig: DragonRig, t: number, flapVigor: number, speedRatio: number) {
   // 상반각(dihedral). 날개를 완전히 수평으로 두면 바로 뒤에서 볼 때 날이 서서
   // 선 하나로만 보인다. 3인칭 추적 시점에서 날개 면이 읽히려면 반드시 각이 있어야 한다.
   const DIHEDRAL = 0.3;
-  // 기본 활공: 아주 느린 상하 흔들림
-  const idle = Math.sin(t * 1.6) * 0.06;
-  // 날갯짓: 위로 크게 들었다가 내려친다
-  const flap = Math.sin(flapPhase * Math.PI) * 0.95;
+  const freq = 1.4 + flapVigor * 3.2;
+  const amp = 0.16 + flapVigor * 0.7;
+  const flap = Math.sin(t * freq) * amp;
   // 빠를수록 날개를 뒤로 접어 항력을 줄인 실루엣을 만든다
   const tuck = speedRatio * 0.55;
 
-  const z = DIHEDRAL + idle + flap - tuck;
+  const z = DIHEDRAL + flap - tuck;
   rig.wingL.rotation.z = -z;
   rig.wingR.rotation.z = z;
   rig.wingL.rotation.y = -tuck * 0.5;

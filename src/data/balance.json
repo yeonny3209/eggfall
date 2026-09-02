@@ -2,52 +2,22 @@
   "_comment": "기획서 §13.4 — 모든 수치는 이 파일 하나에. AI 재생성 없이 혼자 튜닝할 수 있어야 한다.",
 
   "flight": {
-    "_comment": "Phase 0. 여기가 재미없으면 전부 무의미하다 (§11).",
+    "_comment": "Phase 0 — 단순 조작 모델. 마우스가 보는 방향이 비행 방향, WASD 는 그 기준 이동.",
+    "_comment_v2": "이전의 관성/실속/스태미나/뱅크턴 모델은 조작이 너무 어렵다는 피드백으로 걷어냈다.",
 
-    "gravity": 22.0,
-    "maxSpeed": 78.0,
-    "minAirspeed": 9.0,
+    "moveSpeed": 42.0,
+    "verticalSpeed": 30.0,
+    "_comment_speed": "moveSpeed 는 WASD 수평 이동, verticalSpeed 는 Space/Shift 수직 이동 속도(m/s).",
 
-    "thrustForward": 9.0,
-    "dragBase": 0.34,
-    "dragBrake": 1.9,
+    "accelRate": 6.0,
+    "_comment_accel": "목표 속도로 수렴하는 속도(1/s). 낮추면 관성이 더 크게 느껴지고, 높이면 즉각 반응한다.",
 
-    "pitchRate": 1.5,
-    "yawRate": 0.85,
-    "rollRate": 2.6,
-    "_comment_turn": "선회는 롤을 먼저 넣고 피치로 당기는 항공기식. 요만으로 도는 건 느리게 둬서 롤-피치 조합을 유도한다.",
-
-    "bankTurnFactor": 1.35,
-    "autoLevelRate": 0.9,
-
-    "glideSink": 8.0,
-    "_comment_sink": "수평 활공도 서서히 가라앉는다. 이게 없으면 고도가 공짜가 되고 상승기류가 무의미해진다.",
-    "liftCoefficient": 0.055,
-    "stallAngle": 0.62,
-    "stallLiftPenalty": 0.25,
-
-    "flapImpulse": 9.5,
-    "flapInterval": 0.42,
-    "flapStaminaCost": 7.0,
-
-    "diveSpeedBonus": 1.35,
-    "diveDragFactor": 0.42,
-    "diveStaminaCost": 12.0,
-    "_comment_dive": "급강하는 스태미나를 쓰지만 중력이 대신 일해준다. 고도를 벌고 → 내리꽂고 → 다시 벌기의 3차원 리듬 (§8.2).",
-
-    "staminaMax": 100.0,
-    "staminaRegen": 13.0,
-    "staminaRegenGlideBonus": 7.0,
-    "_comment_stamina": "활공 중에는 회복이 빠르다. 쉬는 방법이 곧 활공이라는 뜻.",
+    "turnRate": 9.0,
+    "_comment_turn": "마우스가 정한 목표 각도를 실제 자세가 뒤쫓는 속도(1/s). stage.turnPenalty 와 곱해져 큰 용일수록 느려진다.",
 
     "highLayerY": 220.0,
     "midLayerY": 70.0,
-    "highLayerStaminaDrain": 4.5,
-    "_comment_layer": "고층은 체류만으로 스태미나를 깎는다 (§9). 최고급 알이 있는 곳은 공짜가 아니다.",
-
-    "groundY": 0.0,
-    "landingSpeedLimit": 26.0,
-    "crashDamageSpeed": 46.0,
+    "_comment_layer": "고도 3층 구조(§9)는 지금은 시각적 구분일 뿐 수치 효과는 없다.",
 
     "cameraDistance": 11.0,
     "cameraHeight": 5.5,
@@ -55,19 +25,6 @@
     "cameraSpeedPullback": 0.05,
     "cameraFovBase": 72,
     "cameraFovSpeedGain": 0.22
-  },
-
-  "thermals": {
-    "_comment": "상승기류 — Phase 0의 핵심 지형 요소. 스태미나 없이 고도를 얻는 유일한 방법.",
-    "_comment_radius": "최대뱅크 선회반경(약 60m)보다 넉넉히 커야 한다. 그러지 않으면 기류 안에서 선회가 불가능해 고도를 벌 수 없다.",
-    "radius": 130.0,
-    "strength": 30.0,
-    "_comment_strength": "선회 중 평균 강도(약 0.44)에서도 활공 침하(glideSink 8)를 이겨야 한다. 17 이면 평균 7.4 로 밀려 돌수록 고도를 잃었다.",
-    "coreRatio": 0.6,
-    "_comment_core": "반경의 60%까지는 강도 1로 균일. 그 밖으로 가장자리까지 선형 감쇠.",
-    "maxY": 260.0,
-    "count": 12,
-    "spawnRadius": 1600.0
   },
 
   "stage": {
