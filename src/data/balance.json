@@ -27,6 +27,55 @@
     "cameraFovSpeedGain": 0.22
   },
 
+  "eggs": {
+    "_comment": "자연 둥지 (§7.1) — 고정 위치, 5~15분 리스폰. 초보 수입원.",
+
+    "nestCount": 64,
+    "nestMinRadius": 180.0,
+    "nestMaxRadius": 3200.0,
+    "_comment_nest": "8km 월드에 64개. 리스폰이 5~15분이라 개수가 적으면 월드가 텅 비어 보인다.",
+
+    "respawnMinSec": 300.0,
+    "respawnMaxSec": 900.0,
+
+    "hoverHeight": 7.0,
+    "_comment_hover": "지면에 딱 붙이면 기복에 묻혀 안 보인다. 살짝 띄워 실루엣을 만든다.",
+
+    "rarityWeights": {
+      "common": 1000,
+      "uncommon": 380,
+      "rare": 110,
+      "epic": 26,
+      "divine": 0
+    },
+    "_comment_rarity": "divine 은 0 — 신성 알은 자연 둥지가 아니라 시즌당 12회 각성으로만 나온다 (§5.1).",
+
+    "geneMass": {
+      "common": 10,
+      "uncommon": 26,
+      "rare": 68,
+      "epic": 180,
+      "divine": 900
+    },
+    "_comment_geneMass": "성장은 오직 흡수한 유전 질량 총합으로만 결정된다 (§6.1).",
+
+    "traitCount": {
+      "common": 1,
+      "uncommon": 2,
+      "rare": 3,
+      "epic": 4,
+      "divine": 6
+    },
+
+    "decaySec": 1800.0,
+    "_comment_decay": "미부화 소멸까지의 시간. 주운 뒤 방치하면 사라진다 (§7.2 decayAt).",
+
+    "beaconMinRarity": "rare",
+    "_comment_beacon": "이 등급 이상은 빛기둥을 세워 멀리서도 보이게 한다. 희귀 알이 PvP 무대가 되려면 우선 눈에 띄어야 한다.",
+
+    "radarRange": 900.0
+  },
+
   "stage": {
     "_comment": "성장 단계별 체격·스탯 배율 (§6.1). 커질수록 강하지만 선회가 무뎌진다 (§6.3 불변 규칙).",
     "1": { "name": "해츨링", "scale": 1.0, "turnPenalty": 1.0, "hitbox": 1.0, "skillSlots": 0 },

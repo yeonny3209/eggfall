@@ -180,6 +180,45 @@ export type DragonEgg = {
   divineId?: DivineId;
 };
 
+/**
+ * 자연 둥지 — 고정 위치, 5~15분 리스폰 (§7.1)
+ * 위치는 시드에서 결정론적으로 만들어지므로 저장하지 않는다.
+ */
+export type Nest = {
+  id: string;
+  x: number;
+  z: number;
+};
+
+/** 월드에 실제로 놓인 알. DragonEgg 는 "아이템"이고 이건 "배치"다. */
+export type SpawnedEgg = {
+  egg: DragonEgg;
+  x: number;
+  y: number;
+  z: number;
+  nestId: string;
+};
+
+/** 둥지 한 칸의 상태. 알이 있거나, 리스폰을 기다리는 중이거나 둘 중 하나다. */
+export type NestSlot = {
+  nest: Nest;
+  egg: SpawnedEgg | null;
+  /** egg 가 null 일 때만 의미 있음 — 이 시각(ms)이 지나면 새 알이 놓인다 */
+  respawnAt: number;
+};
+
+/**
+ * 알 스포너 상태 (샤드당 1개).
+ * 순수 데이터라 그대로 직렬화해 서버·클라가 공유할 수 있다 (§13.3).
+ */
+export type SpawnerState = {
+  slots: NestSlot[];
+  /** 알 id 발급용 카운터 */
+  nextEggId: number;
+  /** 난수 상태 — 결정론적 재현을 위해 상태에 포함한다 */
+  rngState: number;
+};
+
 /* ==========================================================================
    신성 (기획서 §5)
    ========================================================================== */

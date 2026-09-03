@@ -1,9 +1,12 @@
 /**
- * EGGFALL — Phase 0 진입점 (단순 조작 버전)
+ * EGGFALL — 진입점
  *
- * 마우스가 보는 방향이 곧 비행 방향, WASD 로 그 방향 기준 이동, Space/Shift 로 상승/하강.
- * 스태미나·실속·상승기류는 없다 — 진입장벽을 낮추기 위해 뺐다.
- * §13.1: "한 세션 = 한 시스템." 그래서 여기에는 알도, 전투도, 네트워크도 없다.
+ * Phase 0 (비행): 마우스가 보는 방향이 곧 비행 방향, WASD 로 그 방향 기준 이동,
+ *                 Space/Shift 로 상승/하강. 스태미나·실속은 없다.
+ * Phase 1 (알):   자연 둥지에서 알이 스폰되고, 주우면 리스폰 타이머가 돈다 (§7.1).
+ *
+ * §13.1 "한 세션 = 한 시스템" 에 따라 아직 운반·흡수·성장은 없다.
+ * 전투와 네트워크도 없다.
  */
 
 import * as THREE from 'three';
@@ -14,7 +17,10 @@ import { InputSource } from './flight/input';
 import { ChaseCamera } from './flight/camera';
 import { buildWorld } from './world/scene';
 import { createDragon, tintFromAffinity, animateWings } from './world/dragon';
+import { createEggField } from './world/eggs';
+import { createSpawner, stepSpawner, activeEggs, nearestEgg, eggsWithin } from './egg/spawn';
 import { mountHud } from './ui/hud';
+import type { EggBearing } from './ui/hud';
 
 const F = balance.flight;
 
@@ -46,12 +52,20 @@ const input = new InputSource(canvas);
 const chase = new ChaseCamera(innerWidth / innerHeight);
 const hud = mountHud();
 
+/* ---------- 알 (Phase 1) ---------- */
+const spawner = createSpawner(4242, Date.now());
+const eggField = createEggField();
+world.scene.add(eggField.group);
+eggField.sync(activeEggs(spawner));
+
 let elapsed = 0;
+// 스포너는 초당 한 번만 돌린다. 리스폰이 분 단위라 매 프레임 볼 이유가 없다.
+let spawnAcc = 0;
 
 // 개발 중 콘솔에서 상태를 들여다보기 위한 핸들. 프로덕션 빌드에서는 붙지 않는다.
 if (import.meta.env.DEV) {
   (globalThis as Record<string, unknown>).__eggfall = {
-    state, rig, chase, world, input,
+    state, rig, chase, world, input, spawner, eggField,
     // 창이 가려져 rAF 가 멈춘 상태에서도 검증할 수 있도록 수동 펌프를 열어둔다
     pump: (seconds: number) => {
       const n = Math.round(seconds / (1 / 60));
@@ -127,6 +141,16 @@ function stepOnce(dt: number) {
   chase.update(state, dt);
   world.update(elapsed, dt, state.x, state.y, state.z);
 
+  /* ---------- 알 ---------- */
+  spawnAcc += dt;
+  if (spawnAcc >= 1) {
+    spawnAcc = 0;
+    if (stepSpawner(spawner, Date.now()).length > 0) {
+      eggField.sync(activeEggs(spawner));
+    }
+  }
+  eggField.update(elapsed);
+
   hud.update({
     speed,
     altitude: state.y,
@@ -134,8 +158,39 @@ function stepOnce(dt: number) {
     grounded: state.grounded,
     stageName: stageDef.name,
     speedRatio,
+    eggsNearby: eggsWithin(spawner, state.x, state.z).length,
+    nearestEgg: bearingToNearestEgg(),
   });
 }
+
+/** 가장 가까운 알을 플레이어 기수 기준 상대 방위로 바꾼다 */
+function bearingToNearestEgg(): EggBearing | null {
+  const found = nearestEgg(spawner, state.x, state.z);
+  if (!found) return null;
+  const { egg: se, dist } = found;
+  // 월드 방위 → 기수 기준 상대 방위. atan2(x, z) 인 이유는 yaw=0 일 때 정면이 +z 이기 때문이다.
+  const worldBearing = Math.atan2(se.x - state.x, se.z - state.z);
+  let rel = worldBearing - state.yaw;
+  rel = ((rel + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return {
+    rarity: se.egg.rarity,
+    element: ELEMENT_LABEL[se.egg.element],
+    dist,
+    // CSS rotate 는 시계방향이 +, 방위각은 반시계가 + 라 부호를 뒤집는다
+    bearing: -rel,
+    dy: se.y - state.y,
+  };
+}
+
+/** 속성 한글 이름 (§3.2) */
+const ELEMENT_LABEL: Record<Element, string> = {
+  ember: '염화',
+  rime: '빙결',
+  gale: '뇌풍',
+  blight: '부식',
+  terra: '반석',
+  umbra: '공허',
+};
 
 function render() {
   renderer.render(world.scene, chase.camera);
