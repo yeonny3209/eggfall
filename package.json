@@ -8,13 +8,20 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "check": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
+    "test": "tsx --test tests/*.test.ts",
+    "server": "tsx watch server/index.ts",
+    "server:start": "tsx server/index.ts"
   },
   "dependencies": {
+    "@colyseus/core": "^0.16.13",
+    "@colyseus/schema": "^3.0.76",
+    "@colyseus/ws-transport": "^0.16.5",
+    "colyseus.js": "^0.16.22",
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@types/node": "^26.4.1",
     "@types/three": "^0.180.0",
     "tsx": "^4.23.13",
     "typescript": "^5.7.0",

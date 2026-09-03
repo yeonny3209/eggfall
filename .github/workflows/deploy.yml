@@ -24,6 +24,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npx tsc --noEmit
+      - run: npx tsc --noEmit -p tsconfig.server.json
       - run: npx tsx --test tests/*.test.ts
       - name: Build
         run: npm run build

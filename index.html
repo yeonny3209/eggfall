@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EGGFALL — Phase 0</title>
+<title>EGGFALL</title>
 <style>
   :root{
     --tx:#e9f0fb; --tx2:#9db0cc; --tx3:#63748f;
@@ -55,6 +55,13 @@
 
   /* 상승기류 레이더 — 핵심 자원을 눈으로만 찾게 두면 대부분 놓친다 */
   .radar{position:absolute;right:22px;top:22px;width:150px;height:150px;opacity:.92}
+
+  /* 접속 상태 — 멀티플레이 여부를 항상 알 수 있어야 한다 */
+  .net{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx3);margin-top:5px}
+  .net i{width:7px;height:7px;border-radius:50%;background:#4a5870;display:block;flex:none}
+  .net.online i{background:var(--good);box-shadow:0 0 7px var(--good)}
+  .net.connecting i{background:var(--warn)}
+  .net.online span{color:var(--good)}
 
   /* 성장 패널 — 단계·유전질량·친화도 (§6) */
   .growth{margin-top:9px;min-width:210px}
@@ -136,9 +143,9 @@
 <div id="hud"></div>
 <div id="hint">
   <h1>EGGFALL</h1>
-  <p>Phase 0 — 비행 컨트롤러<br>
-     <b>W/S</b> 기수 · <b>A/D</b> 선회 · <b>Q/E</b> 롤 · <b>Space</b> 날갯짓 · <b>Shift</b> 급강하<br>
-     푸른 기둥은 상승기류입니다. 스태미나 없이 고도를 얻을 수 있습니다.</p>
+  <p>클릭해서 시작 — 마우스로 보는 방향이 곧 날아가는 방향입니다<br>
+     <b>WASD</b> 이동 · <b>Space</b> 상승 · <b>Shift</b> 하강 · <b>E</b> 알 줍기<br>
+     알을 주워 가운데 빛나는 둥지로 가져가면 흡수하며 성장합니다.</p>
 </div>
 <script type="module" src="/src/main.ts"></script>
 <script>

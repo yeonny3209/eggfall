@@ -49,6 +49,18 @@ export type HudModel = {
   /** 흡수 채널링 진행도 0~1. 진행 중이 아니면 0 */
   absorbProgress: number;
   homeDistance: number;
+
+  /* ---------- 네트워크 (§11 Phase 2) ---------- */
+  netStatus: 'offline' | 'connecting' | 'online' | 'error';
+  /** 나를 포함한 접속 인원 */
+  playerCount: number;
+};
+
+const NET_LABEL: Record<string, string> = {
+  offline: '싱글플레이',
+  connecting: '접속 중…',
+  online: '멀티플레이',
+  error: '싱글플레이',
 };
 
 const RARITY_LABEL: Record<Rarity, string> = {
@@ -86,6 +98,7 @@ export function mountHud() {
         <b id="h-alt">0</b><span class="unit">m</span>
       </div>
       <div class="layer" id="h-layer">중층</div>
+      <div class="net" id="h-net"><i></i><span id="h-net-txt">싱글플레이</span></div>
       <div class="growth">
         <div class="gr-row"><b id="h-stage">해츨링</b><span id="h-mass">0</span></div>
         <div class="gr-bar"><i id="h-grbar"></i></div>
@@ -145,6 +158,8 @@ export function mountHud() {
   const elPrompt = $('h-prompt');
   const elAbsorb = $('h-absorb');
   const elAbsorbBar = $('h-absorb-bar');
+  const elNet = $('h-net');
+  const elNetTxt = $('h-net-txt');
 
   let flashTimer = 0;
   let lastAlert = '';
@@ -156,6 +171,14 @@ export function mountHud() {
 
       elLayer.textContent = LAYER_LABEL[m.layer];
       elLayer.className = 'layer ' + m.layer;
+
+      /* ---------- 네트워크 ---------- */
+      const netCls = 'net ' + m.netStatus;
+      if (elNet.className !== netCls) elNet.className = netCls;
+      elNetTxt.textContent =
+        m.netStatus === 'online'
+          ? `${NET_LABEL.online} · ${m.playerCount}명`
+          : NET_LABEL[m.netStatus];
 
       /* ---------- 성장 ---------- */
       elStageName.textContent = m.stageName;
