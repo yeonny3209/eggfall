@@ -16,6 +16,8 @@ import type { FlightInput } from '../types';
 
 export class InputSource {
   private keys = new Set<string>();
+  /** 이번 프레임에 "새로" 눌린 키. read() 가 소비한다. */
+  private pressedOnce = new Set<string>();
   private target: HTMLElement | Window;
   /** 마우스가 누적해 온 목표 시점 (rad) — 이게 곧 비행 방향이 된다 */
   lookYaw = 0;
@@ -42,13 +44,16 @@ export class InputSource {
   private onKeyDown = (e: KeyboardEvent) => {
     // 게임이 쓰는 키만 브라우저 기본 동작을 막는다 (Space 스크롤 등)
     if (GAME_KEYS.has(e.code)) e.preventDefault();
+    // 꾹 누르고 있으면 keydown 이 반복 발사된다. 눌린 순간만 기록해야
+    // "한 번 눌러 줍기"가 매 프레임 줍기/버리기로 변하지 않는다.
+    if (!this.keys.has(e.code)) this.pressedOnce.add(e.code);
     this.keys.add(e.code);
   };
   private onKeyUp = (e: KeyboardEvent) => {
     this.keys.delete(e.code);
   };
   /** 탭 전환 중 눌린 키가 남아 계속 조작되는 것을 막는다 */
-  private onBlur = () => this.keys.clear();
+  private onBlur = () => { this.keys.clear(); this.pressedOnce.clear(); };
 
   private onLockChange = () => {
     this.pointerLocked = document.pointerLockElement !== null;
@@ -83,12 +88,20 @@ export class InputSource {
       strafe: (right ? 1 : 0) + (left ? -1 : 0),
       ascend: this.held('Space'),
       descend: this.held('ShiftLeft', 'ShiftRight'),
+      interact: this.consumePress('KeyE'),
     };
+  }
+
+  /** 눌린 순간 한 번만 true. 시뮬레이션이 여러 번 돌아도 한 번만 반응한다. */
+  private consumePress(code: string): boolean {
+    if (!this.pressedOnce.has(code)) return false;
+    this.pressedOnce.delete(code);
+    return true;
   }
 }
 
 const GAME_KEYS = new Set([
-  'KeyW', 'KeyA', 'KeyS', 'KeyD',
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE',
   'Space', 'ShiftLeft', 'ShiftRight',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
 ]);

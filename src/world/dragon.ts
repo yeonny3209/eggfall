@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three';
-import type { Element } from '../types';
+import type { Element, Stage } from '../types';
 
 /** 속성별 대표색 — 셰이더 변주의 기준값 (§6.2) */
 export const ELEMENT_COLOR: Record<Element, number> = {
@@ -27,6 +27,8 @@ export type DragonRig = {
   wingL: THREE.Group;
   wingR: THREE.Group;
   body: THREE.Mesh;
+  /** 운반 중인 알이 붙는 자리 (앞발). 여기에 넣으면 드래곤을 따라다닌다. */
+  carrySlot: THREE.Group;
   setTint(color: THREE.Color): void;
 };
 
@@ -47,7 +49,15 @@ export function tintFromAffinity(affinity: Partial<Record<Element, number>>): TH
   return c.multiplyScalar(1 / total);
 }
 
-export function createDragon(tint: THREE.Color): DragonRig {
+/**
+ * 절차적 드래곤을 만든다.
+ *
+ * §6.2: 외형은 저장하지 않고 elementAffinity 와 성장 단계에서 결정론적으로 계산한다.
+ * 같은 친화도 · 같은 단계면 언제나 같은 모습이 나온다.
+ *
+ * @param stage 성장 단계 — 등 가시 개수가 단계만큼 늘어나 성장이 실루엣으로 읽힌다
+ */
+export function createDragon(tint: THREE.Color, stage: Stage = 1): DragonRig {
   const root = new THREE.Group();
 
   const skin = new THREE.MeshStandardMaterial({
@@ -129,11 +139,28 @@ export function createDragon(tint: THREE.Color): DragonRig {
     root.add(leg);
   }
 
+  // 등 가시 — 단계마다 하나씩 늘어난다.
+  // 숫자 UI 없이도 "내가 자랐다"가 실루엣으로 보이게 하는 가장 싼 방법이다.
+  const spikeCount = stage;
+  for (let i = 0; i < spikeCount; i++) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.5 + i * 0.06, 4), skin);
+    // 목덜미에서 꼬리 쪽으로 균등 배치
+    const t = spikeCount === 1 ? 0.5 : i / (spikeCount - 1);
+    spike.position.set(0, 0.55, 1.3 - t * 3.4);
+    root.add(spike);
+  }
+
+  // 운반 중인 알이 붙는 자리 — 앞발 아래
+  const carrySlot = new THREE.Group();
+  carrySlot.position.set(0, -0.85, 0.6);
+  root.add(carrySlot);
+
   return {
     root,
     wingL,
     wingR,
     body,
+    carrySlot,
     setTint(color: THREE.Color) {
       skin.color.copy(color);
       membrane.color.copy(color).multiplyScalar(0.55);

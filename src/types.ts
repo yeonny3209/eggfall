@@ -220,6 +220,37 @@ export type SpawnerState = {
 };
 
 /* ==========================================================================
+   플레이어 진행 (기획서 §2 핵심 루프, §6 성장)
+   ========================================================================== */
+
+/**
+ * 플레이어 드래곤의 성장 상태.
+ * Dragon 타입의 부분집합이지만, Phase 1 에서 실제로 굴러가는 값만 따로 모았다.
+ * (전투 스탯·스킬은 Phase 3~4 에서 Dragon 으로 합류시킨다.)
+ */
+export type PlayerProgress = {
+  /** 성장은 오직 이 값으로만 결정된다 (§6.1) */
+  geneMass: number;
+  stage: Stage;
+  /** 외형·스킬 발현·상태이상 강도를 동시에 결정 (§3.5) */
+  elementAffinity: Record<Element, number>;
+  /** 흡수 이력 누적 — 스킬 발현 풀 (§4.4) */
+  expressionPool: Trait[];
+  /** 지금 운반 중인 알. 한 번에 하나 (§2 운반이 곧 취약함) */
+  carried: DragonEgg | null;
+  /** 누적 흡수 개수 — 통계·UI 용 */
+  absorbed: number;
+};
+
+/** 흡수 결과 — 레벨업 연출에 필요한 정보를 함께 돌려준다 */
+export type AbsorbResult = {
+  gained: number;
+  leveledUp: boolean;
+  fromStage: Stage;
+  toStage: Stage;
+};
+
+/* ==========================================================================
    신성 (기획서 §5)
    ========================================================================== */
 
@@ -320,6 +351,8 @@ export type FlightInput = {
   ascend: boolean;
   /** Shift 누르는 동안 하강 */
   descend: boolean;
+  /** E — 줍기/내려놓기. 누른 순간 한 번만 true (연타 방지) */
+  interact: boolean;
 };
 
 /**

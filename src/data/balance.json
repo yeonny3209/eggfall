@@ -92,7 +92,33 @@
     "staminaCostMult": 1.4,
     "breathDisabled": true,
     "positionRevealed": true,
-    "dropOnHit": true
+    "dropOnHit": true,
+
+    "pickupRange": 22.0,
+    "_comment_pickup": "이 거리 안에서 E 로 줍는다. 너무 좁으면 고속 비행 중 절대 못 잡는다.",
+    "carrySlots": 1,
+    "_comment_slots": "한 번에 알 하나. 여러 개를 들 수 있으면 운반의 긴장이 사라진다."
+  },
+
+  "growth": {
+    "_comment": "성장 (§6.1) — 오직 흡수한 유전 질량 총합으로만 결정된다. 사냥 파밍으로는 절대 오르지 않는다.",
+    "_comment_thresholds": "일반 알 10, 고급 26, 희귀 68, 영웅 180. 초반 성장은 몇 개만 먹어도 체감되도록 낮게 잡았다.",
+    "stageThresholds": [0, 50, 180, 500, 1200, 2600],
+
+    "absorbSeconds": 1.8,
+    "_comment_absorb": "홈 둥지에서 흡수하는 데 걸리는 시간. 신성 알의 10초 채널링(§5.1)의 축소판이자 연출용 여백이다.",
+
+    "affinityDecay": 0.0,
+    "_comment_affinity": "흡수한 알의 속성 비율이 누적돼 외형·스킬 발현을 결정한다 (§3.5). 감쇠 0 = 과거 흡수가 영구히 남는다."
+  },
+
+  "homeNest": {
+    "_comment": "둥지 귀환 지점 (§2 핵심 루프). Phase 7 의 비행단 공용 둥지로 확장될 자리다.",
+    "x": 0.0,
+    "z": 0.0,
+    "radius": 55.0,
+    "_comment_radius": "넉넉해야 한다. 고속 비행 중 좁은 점에 정확히 착지시키면 그게 곧 스트레스다.",
+    "beaconHeight": 400.0
   },
 
   "status": {

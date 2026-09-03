@@ -59,6 +59,31 @@ function beaconTexture(): THREE.Texture {
   return tex;
 }
 
+/**
+ * 운반 중인 알의 작은 메시. 드래곤의 carrySlot 에 붙인다.
+ * 손에 든 게 보여야 "지금 취약하다"(§2)가 UI 없이 전달된다.
+ */
+export function createCarriedEggMesh(rarity: Rarity, element: string): THREE.Mesh {
+  const style = RARITY_STYLE[rarity];
+  const color = new THREE.Color(ELEMENT_COLOR[element as keyof typeof ELEMENT_COLOR]);
+  const geo = new THREE.SphereGeometry(1, 10, 8);
+  geo.scale(0.78, 1.12, 0.78);
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.35,
+      metalness: 0.2,
+      emissive: color,
+      emissiveIntensity: style.glow,
+      flatShading: true,
+    }),
+  );
+  // 드래곤 스케일 안에서 보이도록 실제 알보다 작게
+  mesh.scale.setScalar(0.9 * style.scale);
+  return mesh;
+}
+
 export function createEggField(): EggField {
   const group = new THREE.Group();
   const beaconTex = beaconTexture();

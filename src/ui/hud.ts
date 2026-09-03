@@ -1,8 +1,8 @@
 /**
- * HUD — Phase 0 (단순 조작 버전)
+ * HUD
  *
- * 스태미나·실속·상승기류가 사라졌으니 HUD 도 그만큼 가벼워진다.
- * 지금 보여줄 건 속도·고도·층 표시, 그리고 착지 여부뿐이다.
+ * Phase 0: 속도·고도·층 표시, 착지 알림
+ * Phase 1: 성장(단계·유전질량·친화도), 알 파인더, 운반 상태, 흡수 채널링
  */
 
 import type { Layer, Rarity } from '../types';
@@ -30,6 +30,25 @@ export type HudModel = {
   /** 주변 알 개수 (레이더 반경 내) */
   eggsNearby: number;
   nearestEgg: EggBearing | null;
+
+  /* ---------- 성장 (§6) ---------- */
+  stage: number;
+  geneMass: number;
+  /** 다음 단계까지. 최대 단계면 null */
+  nextStage: { need: number; progress: number } | null;
+  affinityKind: string;
+  /** 정규화된 친화도 상위 항목들 */
+  affinityTop: { element: string; ratio: number }[];
+
+  /* ---------- 운반 (§2) ---------- */
+  carrying: { rarity: Rarity; element: string; geneMass: number } | null;
+  /** 지금 E 로 주울 수 있는 알 */
+  pickupTarget: { rarity: Rarity; element: string } | null;
+  /** 홈 둥지 안에 있는가 */
+  inHome: boolean;
+  /** 흡수 채널링 진행도 0~1. 진행 중이 아니면 0 */
+  absorbProgress: number;
+  homeDistance: number;
 };
 
 const RARITY_LABEL: Record<Rarity, string> = {
@@ -67,6 +86,11 @@ export function mountHud() {
         <b id="h-alt">0</b><span class="unit">m</span>
       </div>
       <div class="layer" id="h-layer">중층</div>
+      <div class="growth">
+        <div class="gr-row"><b id="h-stage">해츨링</b><span id="h-mass">0</span></div>
+        <div class="gr-bar"><i id="h-grbar"></i></div>
+        <div class="gr-sub" id="h-affinity"></div>
+      </div>
     </div>
     <div class="hud-center">
       <div id="h-alert" class="alert"></div>
@@ -81,12 +105,18 @@ export function mountHud() {
       <div class="eg-count" id="h-egg-count"></div>
     </div>
     <div id="h-streaks" class="streaks"></div>
+    <div class="carry" id="h-carry">
+      <div class="cr-head">운반 중 · 이동 −25%</div>
+      <div class="cr-name" id="h-carry-name">—</div>
+      <div class="cr-hint" id="h-carry-hint"></div>
+    </div>
+    <div class="prompt" id="h-prompt"></div>
+    <div class="absorb" id="h-absorb"><i id="h-absorb-bar"></i><span>흡수 중…</span></div>
     <div class="hud-right">
-      <div class="stage" id="h-stage">드레이크</div>
       <div class="keys">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동</div>
-        <div><kbd>Space</kbd> 상승</div>
-        <div><kbd>Shift</kbd> 하강</div>
+        <div><kbd>Space</kbd> 상승 · <kbd>Shift</kbd> 하강</div>
+        <div><kbd>E</kbd> 알 줍기 / 내려놓기</div>
         <div class="dim">마우스 — 시점 회전 · 클릭으로 활성화</div>
       </div>
     </div>
@@ -98,7 +128,6 @@ export function mountHud() {
   const elAlt = $('h-alt');
   const elLayer = $('h-layer');
   const elAlert = $('h-alert');
-  const elStage = $('h-stage');
   const elFlash = $('h-flash');
   const elStreaks = $('h-streaks');
   const elEgg = $('h-egg');
@@ -106,6 +135,16 @@ export function mountHud() {
   const elEggName = $('h-egg-name');
   const elEggDist = $('h-egg-dist');
   const elEggCount = $('h-egg-count');
+  const elStageName = $('h-stage');
+  const elMass = $('h-mass');
+  const elGrBar = $('h-grbar');
+  const elAffinity = $('h-affinity');
+  const elCarry = $('h-carry');
+  const elCarryName = $('h-carry-name');
+  const elCarryHint = $('h-carry-hint');
+  const elPrompt = $('h-prompt');
+  const elAbsorb = $('h-absorb');
+  const elAbsorbBar = $('h-absorb-bar');
 
   let flashTimer = 0;
   let lastAlert = '';
@@ -117,7 +156,51 @@ export function mountHud() {
 
       elLayer.textContent = LAYER_LABEL[m.layer];
       elLayer.className = 'layer ' + m.layer;
-      elStage.textContent = m.stageName;
+
+      /* ---------- 성장 ---------- */
+      elStageName.textContent = m.stageName;
+      elMass.textContent = `유전질량 ${Math.round(m.geneMass)}`;
+      if (m.nextStage) {
+        elGrBar.style.width = (m.nextStage.progress * 100).toFixed(1) + '%';
+        elGrBar.style.opacity = '1';
+      } else {
+        elGrBar.style.width = '100%';
+        elGrBar.style.opacity = '0.5';
+      }
+      elAffinity.textContent = m.affinityTop.length
+        ? `${m.affinityKind} · ` +
+          m.affinityTop.map((a) => `${a.element} ${(a.ratio * 100).toFixed(0)}%`).join(' / ')
+        : '아직 흡수한 알이 없습니다';
+
+      /* ---------- 운반 ---------- */
+      if (m.carrying) {
+        elCarry.className = 'carry on';
+        elCarryName.textContent =
+          `${RARITY_LABEL[m.carrying.rarity]} · ${m.carrying.element} (+${m.carrying.geneMass})`;
+        elCarryName.style.color = RARITY_COLOR[m.carrying.rarity];
+        elCarryHint.textContent = m.inHome
+          ? '둥지 안 — 흡수 중'
+          : `둥지까지 ${m.homeDistance.toFixed(0)}m · E 로 내려놓기`;
+      } else {
+        elCarry.className = 'carry';
+      }
+
+      /* ---------- 상호작용 프롬프트 ---------- */
+      if (!m.carrying && m.pickupTarget) {
+        elPrompt.className = 'prompt on';
+        elPrompt.innerHTML =
+          `<kbd>E</kbd> ${RARITY_LABEL[m.pickupTarget.rarity]} · ${m.pickupTarget.element} 줍기`;
+      } else {
+        elPrompt.className = 'prompt';
+      }
+
+      /* ---------- 흡수 채널링 ---------- */
+      if (m.absorbProgress > 0) {
+        elAbsorb.className = 'absorb on';
+        elAbsorbBar.style.width = (m.absorbProgress * 100).toFixed(1) + '%';
+      } else {
+        elAbsorb.className = 'absorb';
+      }
 
       const alert = m.grounded ? '착지 — Space 로 다시 이륙' : '';
       if (alert !== lastAlert) {

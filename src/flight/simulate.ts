@@ -31,7 +31,7 @@ export function createFlightState(x = 0, y = 150, z = 0, yaw = 0): FlightState {
 }
 
 export function neutralInput(): FlightInput {
-  return { forward: 0, strafe: 0, ascend: false, descend: false };
+  return { forward: 0, strafe: 0, ascend: false, descend: false, interact: false };
 }
 
 /** 자세(pitch/yaw)에서 정면 방향 벡터를 만든다 */
@@ -67,6 +67,7 @@ export function stepFlight(
   lookPitch: number,
   dt: number,
   turnRateMult = 1,
+  speedMult = 1,
 ): FlightEvents {
   const ev: FlightEvents = { justLanded: false };
 
@@ -80,12 +81,15 @@ export function stepFlight(
   const right = rightVector(state.yaw);
 
   /* ---------- 목표 속도 ---------- */
-  const targetVx = fwd.x * input.forward * F.moveSpeed + right.x * input.strafe * F.moveSpeed;
+  // 운반 중이면 전체적으로 느려진다 (§2 — 알을 쥔 동안 이동 -25%)
+  const move = F.moveSpeed * speedMult;
+  const vert = F.verticalSpeed * speedMult;
+  const targetVx = fwd.x * input.forward * move + right.x * input.strafe * move;
   const targetVy =
-    fwd.y * input.forward * F.moveSpeed +
-    (input.ascend ? F.verticalSpeed : 0) -
-    (input.descend ? F.verticalSpeed : 0);
-  const targetVz = fwd.z * input.forward * F.moveSpeed + right.z * input.strafe * F.moveSpeed;
+    fwd.y * input.forward * move +
+    (input.ascend ? vert : 0) -
+    (input.descend ? vert : 0);
+  const targetVz = fwd.z * input.forward * move + right.z * input.strafe * move;
 
   // 즉시 정지/출발이 아니라 부드럽게 가감속한다 — 이게 없으면 뚝뚝 끊기는 느낌이 든다.
   const accel = 1 - Math.exp(-F.accelRate * dt);
